@@ -6,5 +6,5 @@ export default function MapScreen() {
       title="Interactive Map"
       description="Find nearby treasure chests and follow the hints to dig them up."
     />
-  );
+  )
 }
