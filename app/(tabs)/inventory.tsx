@@ -3,6 +3,8 @@ import { useState } from 'react';
 // Built-in React Native pieces used to build the screen, read sizes, and measure space.
 import {
   type LayoutChangeEvent,
+  // Tells which platform the app is running on (web, iOS, or Android).
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,18 +15,17 @@ import {
 // Gives the screen the current light or dark colors.
 import { useTheme } from '../../constants/theme';
 
-// Screens at least this wide get the four-section computer layout.
+// Screens at least this wide get the side-by-side computer layout.
 const WIDE_SCREEN_MIN_WIDTH = 768;
 // On phones, the regular inventory shows at least this many boxes (rounded up to full rows).
-const INVENTORY_SLOT_COUNT = 36;
-// On phones, the equipped section shows at least this many boxes (rounded up to full rows).
-const EQUIPPED_SLOT_COUNT = 6;
+// Raised from 36 to 100 so there is room for more items (computers scroll to reach the extra boxes).
+const INVENTORY_SLOT_COUNT = 100;
 // Width and height of each inventory box, in pixels.
 const SLOT_SIZE = 96;
 // Space between boxes, in pixels; also used when counting how many boxes fit.
 const SLOT_GAP = 6;
 
-// The Inventory tab: avatar, equipped items, and the regular inventory.
+// The Inventory tab: avatar and the regular inventory.
 export default function InventoryScreen() {
   // Reads the current theme colors.
   const { colors } = useTheme();
@@ -35,7 +36,7 @@ export default function InventoryScreen() {
   // True on computers and wide tablets, false on phones.
   const isWide = width >= WIDE_SCREEN_MIN_WIDTH;
 
-  // The top right section on computers; first on phones.
+  // The right side on computers; first on phones.
   const avatarSection = (
     // A bordered panel that holds the avatar.
     <View style={[styles.section, styles.avatarSection]}>
@@ -49,29 +50,24 @@ export default function InventoryScreen() {
     </View>
   );
 
-  // The bottom right section on computers; second on phones.
-  const equippedSection = (
-    // A bordered panel that holds the equipped item boxes.
-    <View style={[styles.section, isWide && styles.fill]}>
-      {/* Section heading. */}
-      <Text style={styles.heading}>Equipped</Text>
-      {/* The boxes for items the avatar is using. */}
-      <SlotGrid minCount={EQUIPPED_SLOT_COUNT} fillHeight={isWide} styles={styles} />
-    </View>
-  );
-
-  // The left side on computers; third on phones.
+  // The left side on computers; second on phones.
   const inventorySection = (
     // A bordered panel that holds the regular inventory boxes.
     <View style={[styles.section, isWide && styles.fill]}>
       {/* Section heading. */}
       <Text style={styles.heading}>Inventory</Text>
       {/* The grid of empty boxes for collected items. */}
-      <SlotGrid minCount={INVENTORY_SLOT_COUNT} fillHeight={isWide} styles={styles} />
+      {/* On computers, scrollable adds a scroll bar on the right when there are more boxes than fit. */}
+      <SlotGrid
+        minCount={INVENTORY_SLOT_COUNT}
+        fillHeight={isWide}
+        scrollable={isWide}
+        styles={styles}
+      />
     </View>
   );
 
-  // Computer layout: inventory on the left, avatar and equipped stacked on the right.
+  // Computer layout: inventory on the left, avatar on the right.
   if (isWide) {
     // Returns the side-by-side layout.
     return (
@@ -79,13 +75,8 @@ export default function InventoryScreen() {
       <View style={[styles.screen, styles.wideRow]}>
         {/* Left half: the regular inventory, top and bottom. */}
         <View style={styles.column}>{inventorySection}</View>
-        {/* Right half: avatar on top, equipped items below. */}
-        <View style={styles.column}>
-          {/* Top right. */}
-          {avatarSection}
-          {/* Bottom right. */}
-          {equippedSection}
-        </View>
+        {/* Right half: the avatar, filling the whole height. */}
+        <View style={styles.column}>{avatarSection}</View>
       </View>
     );
   }
@@ -96,9 +87,7 @@ export default function InventoryScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.phoneColumn}>
       {/* First: the avatar. */}
       {avatarSection}
-      {/* Second: what the avatar is using. */}
-      {equippedSection}
-      {/* Third: the regular inventory. */}
+      {/* Second: the regular inventory. */}
       {inventorySection}
     </ScrollView>
   );
@@ -110,6 +99,8 @@ type SlotGridProps = {
   minCount: number;
   // True on computers: fill the section's height with rows instead of using minCount.
   fillHeight: boolean;
+  // True to put the grid in its own scroll area; optional, so it is off unless asked for.
+  scrollable?: boolean;
   // The screen's styles, so the boxes match the current theme.
   styles: ReturnType<typeof createStyles>;
 };
@@ -121,9 +112,11 @@ function slotsThatFit(length: number) {
 }
 
 // Draws a grid of empty item boxes that fills the space it is given.
-function SlotGrid({ minCount, fillHeight, styles }: SlotGridProps) {
+function SlotGrid({ minCount, fillHeight, scrollable = false, styles }: SlotGridProps) {
   // Remembers the grid's measured width and height (zero until the first measurement).
   const [size, setSize] = useState({ width: 0, height: 0 });
+  // Remembers how tall the visible part of the scroll area is (only used when scrollable).
+  const [viewHeight, setViewHeight] = useState(0);
 
   // Saves the grid's new size whenever its space changes, such as a window resize.
   function handleLayout(event: LayoutChangeEvent) {
@@ -133,23 +126,47 @@ function SlotGrid({ minCount, fillHeight, styles }: SlotGridProps) {
     setSize({ width, height });
   }
 
+  // Saves the scroll area's visible height, which stays the same no matter how many boxes are inside.
+  function handleScrollLayout(event: LayoutChangeEvent) {
+    // Stores only the height; the width still comes from the grid itself.
+    setViewHeight(event.nativeEvent.layout.height);
+  }
+
   // How many boxes fit across one row.
   const columns = slotsThatFit(size.width);
-  // Computers: as many rows as fit; phones: enough rows to hold minCount.
-  const rows = fillHeight ? slotsThatFit(size.height) : Math.ceil(minCount / columns);
+  // Rows needed to hold at least minCount boxes.
+  const minRows = Math.ceil(minCount / columns);
+  // Rows that fit in the visible space; a scrolling grid's own height grows with its boxes, so it uses viewHeight.
+  const fitRows = slotsThatFit(scrollable ? viewHeight : size.height);
+  // Scrolling: fill the view, or more if minCount needs it; computers: fill; phones: hold minCount.
+  const rows = scrollable ? Math.max(fitRows, minRows) : fillHeight ? fitRows : minRows;
   // Draws nothing until the grid has been measured, then fills every row completely.
   const count = size.width > 0 ? columns * rows : 0;
 
-  // Returns the grid.
-  return (
+  // The grid of boxes, shared by the scrolling and non-scrolling versions.
+  const grid = (
     // A row that wraps onto new lines; it measures itself so the count can be calculated.
-    <View style={[styles.slotGrid, fillHeight && styles.fill]} onLayout={handleLayout}>
+    // It only stretches to fill when not scrolling, so a scrolling grid can grow past the view.
+    <View style={[styles.slotGrid, fillHeight && !scrollable && styles.fill]} onLayout={handleLayout}>
       {/* Makes a list of `count` numbers and draws one box for each. */}
       {Array.from({ length: count }, (_, index) => (
         // One empty box; key keeps React's list tracking correct.
         <View key={index} style={styles.slot} />
       ))}
     </View>
+  );
+
+  // Without scrolling, the grid is returned as is.
+  if (!scrollable) return grid;
+
+  // With scrolling, the grid sits inside a scroll area whose bar appears on the right.
+  return (
+    // Fills the section, measures its visible height, and keeps the bar visible on Android.
+    // scrollArea also colors the bar on web to match the theme.
+    <ScrollView style={styles.scrollArea} onLayout={handleScrollLayout} persistentScrollbar>
+      {/* The boxes; anything below the visible area is reached by scrolling. */}
+      {grid}
+    </ScrollView>
   );
 }
 
@@ -207,9 +224,17 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
       // Takes all remaining height.
       flex: 1,
     },
-    // Gives the avatar section more room than the equipped section.
+    // The inventory's scroll area on computers.
+    scrollArea: {
+      // Takes all remaining height in the section.
+      flex: 1,
+      // Web only: colors the scroll bar's handle and track with the theme so it blends in.
+      // (Phones use their own small overlay bar, so this is skipped there.)
+      ...(Platform.OS === 'web' && { scrollbarColor: `${colors.border} ${colors.surface}` }),
+    },
+    // Sizes the avatar section.
     avatarSection: {
-      // Takes the leftover height on computers.
+      // Fills the whole right half on computers.
       flex: 1,
       // Keeps it tall enough to see the avatar on phones.
       minHeight: 300,
