@@ -1,10 +1,5 @@
-import ScreenPlaceholder from '../../components/ScreenPlaceholder';
+import MapView from '../../components/MapView';
 
 export default function MapScreen() {
-  return (
-    <ScreenPlaceholder
-      title="Interactive Map"
-      description="Find nearby treasure chests and follow the hints to dig them up."
-    />
-  )
+  return <MapView />;
 }
