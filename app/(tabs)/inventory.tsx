@@ -6,10 +6,14 @@ import {
   // Tells which platform the app is running on (web, iOS, or Android).
   Platform,
   ScrollView,
+  // Type for a style that may be a single style, a list of styles, or nothing.
+  type StyleProp,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
+  // Type describing the style options a View accepts.
+  type ViewStyle,
 } from 'react-native';
 
 // Gives the screen the current light or dark colors.
@@ -24,6 +28,17 @@ const INVENTORY_SLOT_COUNT = 100;
 const SLOT_SIZE = 96;
 // Space between boxes, in pixels; also used when counting how many boxes fit.
 const SLOT_GAP = 6;
+// The four armor slots, listed top to bottom.
+const ARMOR_SLOTS = ['Head', 'Chest', 'Legs', 'Feet'];
+// Wardrobe spacing is measured in box sizes, so everything shrinks together on narrow screens.
+// Space between the stacked armor boxes (0.125 of a box = 12px at full size).
+const ARMOR_GAP_RATIO = 0.125;
+// The one equal space between every side-by-side box in the row (36px at full size).
+const ITEM_GAP_RATIO = 0.375;
+// How far the arm boxes are raised above the hand boxes (about 38px at full size).
+const ARM_RAISE_RATIO = 0.4;
+// Total row width in box sizes: 5 boxes plus the 4 equal gaps between them.
+const WARDROBE_ROW_UNITS = 5 + 4 * ITEM_GAP_RATIO;
 
 // The Inventory tab: avatar and the regular inventory.
 export default function InventoryScreen() {
@@ -50,7 +65,59 @@ export default function InventoryScreen() {
     </View>
   );
 
-  // The left side on computers; second on phones.
+  // Remembers how wide the wardrobe row is (zero until it is first measured).
+  const [wardrobeWidth, setWardrobeWidth] = useState(0);
+  // Box size: as big as fits across the row, but never bigger than a regular inventory box.
+  const equipSize = Math.min(SLOT_SIZE, Math.floor(wardrobeWidth / WARDROBE_ROW_UNITS));
+  // The equal space between every side-by-side box, scaled to the box size.
+  const itemGap = equipSize * ITEM_GAP_RATIO;
+  // Moves the arm boxes up; negative because up is the negative direction on screen.
+  const armRaise = { transform: [{ translateY: -equipSize * ARM_RAISE_RATIO }] };
+
+  // Saves the wardrobe row's width whenever its space changes, such as a window resize.
+  function handleWardrobeLayout(event: LayoutChangeEvent) {
+    // Stores the width so the box size is recalculated.
+    setWardrobeWidth(event.nativeEvent.layout.width);
+  }
+
+  // The bottom right on computers; second on phones.
+  const equipmentSection = (
+    // A bordered panel that holds what the character wears and holds.
+    <View style={styles.section}>
+      {/* Section heading. */}
+      <Text style={styles.heading}>Wardrobe</Text>
+      {/* The Pack slot for back items (jet packs, backpacks), pinned to the panel's top right corner. */}
+      <View style={styles.packCorner}>
+        {/* Its name, styled like "Wardrobe" so the two line up across the top. */}
+        <Text style={styles.heading}>Pack</Text>
+        {/* The empty back-item box, the same size as the other wardrobe boxes. */}
+        <EquipSlot size={equipSize} styles={styles} />
+      </View>
+      {/* A row of five: left hand, left arm, armor column, right arm, right hand, centered in the panel. */}
+      {/* It measures its width so the boxes can shrink to fit narrow screens. */}
+      {/* The gap puts the same space between every pair of neighboring boxes. */}
+      <View style={[styles.equipmentRow, { gap: itemGap }]} onLayout={handleWardrobeLayout}>
+        {/* The item held in the left hand. */}
+        <EquipSlot size={equipSize} styles={styles} />
+        {/* The left arm piece (forearm to upper arm), raised above the hand box. */}
+        <EquipSlot size={equipSize} styles={styles} style={armRaise} />
+        {/* The four armor boxes stacked top to bottom, with gaps scaled to the box size. */}
+        <View style={{ gap: equipSize * ARMOR_GAP_RATIO }}>
+          {/* Draws one box for each armor slot: head, chest, legs, feet. */}
+          {ARMOR_SLOTS.map((label) => (
+            // One armor box; key uses the slot name because each name is unique.
+            <EquipSlot key={label} size={equipSize} styles={styles} />
+          ))}
+        </View>
+        {/* The right arm piece, mirroring the left one. */}
+        <EquipSlot size={equipSize} styles={styles} style={armRaise} />
+        {/* The item held in the right hand. */}
+        <EquipSlot size={equipSize} styles={styles} />
+      </View>
+    </View>
+  );
+
+  // The left side on computers; third on phones.
   const inventorySection = (
     // A bordered panel that holds the regular inventory boxes.
     <View style={[styles.section, isWide && styles.fill]}>
@@ -75,8 +142,13 @@ export default function InventoryScreen() {
       <View style={[styles.screen, styles.wideRow]}>
         {/* Left half: the regular inventory, top and bottom. */}
         <View style={styles.column}>{inventorySection}</View>
-        {/* Right half: the avatar, filling the whole height. */}
-        <View style={styles.column}>{avatarSection}</View>
+        {/* Right half: the avatar on top, the equipment below it in the bottom right. */}
+        <View style={styles.column}>
+          {/* The avatar stretches to fill whatever height the equipment leaves. */}
+          {avatarSection}
+          {/* The equipment panel takes only the height its boxes need. */}
+          {equipmentSection}
+        </View>
       </View>
     );
   }
@@ -87,9 +159,30 @@ export default function InventoryScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.phoneColumn}>
       {/* First: the avatar. */}
       {avatarSection}
-      {/* Second: the regular inventory. */}
+      {/* Second: the equipment. */}
+      {equipmentSection}
+      {/* Third: the regular inventory. */}
       {inventorySection}
     </ScrollView>
+  );
+}
+
+// Describes the values EquipSlot needs.
+type EquipSlotProps = {
+  // Width and height of the box, in pixels.
+  size: number;
+  // The screen's styles, so the box matches the current theme.
+  styles: ReturnType<typeof createStyles>;
+  // Extra spacing or positioning for this box; optional, so most boxes skip it.
+  style?: StyleProp<ViewStyle>;
+};
+
+// Draws one empty equipment box.
+function EquipSlot({ size, styles, style }: EquipSlotProps) {
+  // Returns the box.
+  return (
+    // Reuses the inventory box look, sets the size, then applies any extra style.
+    <View style={[styles.slot, { width: size, height: size }, style]} />
   );
 }
 
@@ -299,6 +392,28 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
       borderColor: colors.border,
       // Slightly rounded corners.
       borderRadius: 4,
+    },
+    // Holds the Pack name and box in the Wardrobe panel's top right corner.
+    packCorner: {
+      // Takes it out of the normal top-to-bottom flow so it doesn't push the row down.
+      position: 'absolute',
+      // Lines its top up with the "Wardrobe" heading (matches the panel's padding).
+      top: 16,
+      // Keeps it the same distance from the right edge as the heading is from the left.
+      right: 16,
+      // Centers the name over the box.
+      alignItems: 'center',
+      // Space between the name and the box.
+      gap: 6,
+    },
+    // The row holding the hands, arms, and armor column.
+    equipmentRow: {
+      // Lays the three parts out left to right.
+      flexDirection: 'row',
+      // Centers the three parts across the panel.
+      justifyContent: 'center',
+      // Lines the hand boxes up with the middle of the armor column.
+      alignItems: 'center',
     },
   });
 }
