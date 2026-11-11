@@ -40,7 +40,13 @@ export default function MapView() {
       },
     });
 
-    map.addControl(new NavigationControl(), 'top-right');
+    map.addControl(
+      new NavigationControl({
+        showZoom: false,
+        showCompass: true,
+      }),
+      'top-right',
+    );
 
     map.once('load', () => {
       hideLabelLayers(map);
