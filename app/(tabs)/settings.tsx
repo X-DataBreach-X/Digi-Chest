@@ -3,6 +3,7 @@ import { useState, type ComponentProps } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { useTheme } from '../../constants/theme';
+import { useAuth } from '../../src/auth';
 
 type SettingRowProps = {
   icon: ComponentProps<typeof Ionicons>['name'];
@@ -41,6 +42,7 @@ export default function SettingsScreen() {
   const [notifications, setNotifications] = useState(true);
   const [locationServices, setLocationServices] = useState(true);
   const [soundEffects, setSoundEffects] = useState(true);
+  const { user, signOut } = useAuth();
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -88,6 +90,13 @@ export default function SettingsScreen() {
 
       <Text style={styles.sectionTitle}>Account</Text>
       <View style={styles.accountCard}>
+        <View style={styles.accountRow}>
+          <Ionicons name="mail-outline" size={21} color={colors.textMuted} />
+          <View style={styles.accountCopy}>
+            <Text style={styles.accountLabel}>Signed in as</Text>
+            <Text style={styles.accountEmail}>{user?.email}</Text>
+          </View>
+        </View>
         <Pressable style={styles.accountRow} accessibilityLabel="Edit profile">
           <Ionicons name="create-outline" size={21} color={colors.textMuted} />
           <Text style={styles.accountLabel}>Edit profile</Text>
@@ -100,7 +109,7 @@ export default function SettingsScreen() {
         </Pressable>
       </View>
 
-      <Pressable style={styles.signOutButton} accessibilityLabel="Sign out">
+      <Pressable style={styles.signOutButton} accessibilityLabel="Sign out" onPress={signOut}>
         <Ionicons name="log-out-outline" size={20} color={colors.danger} />
         <Text style={styles.signOutText}>Sign out</Text>
       </Pressable>
@@ -205,6 +214,14 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
     flex: 1,
     fontSize: 15,
     color: colors.text,
+  },
+  accountCopy: {
+    flex: 1,
+  },
+  accountEmail: {
+    marginTop: 3,
+    color: colors.textMuted,
+    fontSize: 12,
   },
   signOutButton: {
     height: 52,
