@@ -7,9 +7,11 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.digitalchest.app",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.digitalchest.app",
       "adaptiveIcon": {
         "backgroundColor": "#0f172a"
       }
@@ -20,7 +22,8 @@
     "plugins": [
       "expo-router",
       "expo-status-bar",
-      "expo-maps"
+      "expo-maps",
+      "expo-web-browser"
     ]
   }
 }
