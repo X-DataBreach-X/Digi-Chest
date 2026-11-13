@@ -1,21 +1,17 @@
 import 'leaflet/dist/leaflet.css';
 
-import { Redirect, Stack, useSegments } from 'expo-router';
-import { useAuth, AuthProvider } from '../src/auth';
+import { Stack } from 'expo-router';
+import { AuthProvider } from '../src/auth';
 import { StatusBar } from 'expo-status-bar';
 
 import { ThemeProvider, useTheme } from '../constants/theme';
 
+export const unstable_settings = {
+  initialRouteName: '(tabs)',
+};
+
 function AppNavigator() {
   const { isDark } = useTheme();
-  const { user, loading } = useAuth();
-  const segments = useSegments();
-
-  if (loading) return null;
-
-  const onAuthScreen = segments[0] === 'auth';
-  if (!user && !onAuthScreen) return <Redirect href="/auth" />;
-  if (user && onAuthScreen) return <Redirect href="/(tabs)" />;
 
   return (
     <>

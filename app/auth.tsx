@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
@@ -13,10 +14,17 @@ export default function AuthScreen() {
   const { colors } = useTheme();
   const styles = createStyles(colors);
   const { signIn, signUp, signInWithGoogle, signInWithGoogleCredential } = useAuth();
+  const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+  const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+  const isExpoGo = Constants.appOwnership === 'expo';
+  const nativeGoogleConfigured = Platform.OS === 'android' ? Boolean(androidClientId) : Boolean(iosClientId);
   const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    // AuthSession requires defined native IDs while creating the hook. Use
+    // sentinels here and block the action below until real IDs exist.
+    webClientId: webClientId ?? 'missing-web-client-id',
+    iosClientId: iosClientId ?? 'missing-ios-client-id',
+    androidClientId: androidClientId ?? 'missing-android-client-id',
   });
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
@@ -65,12 +73,21 @@ export default function AuthScreen() {
     setSubmitting(true);
     try {
       if (Platform.OS === 'web') {
+        if (!webClientId) {
+          setError('Google sign-in is not configured. Add the Google client IDs to your environment.');
+          return;
+        }
         await signInWithGoogle();
+      } else if (isExpoGo) {
+        setError('Google sign-in requires a development build. Use email and password in Expo Go.');
+        setSubmitting(false);
+        return;
+      } else if (!nativeGoogleConfigured) {
+        setError('Google sign-in is not configured. Add the Google client IDs to your environment.');
+        setSubmitting(false);
+        return;
       } else if (request) {
         await promptAsync();
-      } else {
-        setError('Native Google sign-in is not configured yet. Add the Google client IDs to your environment.');
-        setSubmitting(false);
       }
     } catch (requestError) {
       setError(authErrorMessage(requestError));
