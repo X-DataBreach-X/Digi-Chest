@@ -10,9 +10,26 @@ type IconName = ComponentProps<typeof Ionicons>['name'];
 
 // Each tab shows a filled icon when selected and an outline icon otherwise.
 function tabIcon(focusedIcon: IconName, unfocusedIcon: IconName) {
-  return ({ color, size, focused }: { color: ColorValue; size: number; focused: boolean }) => (
-    <Ionicons name={focused ? focusedIcon : unfocusedIcon} size={size} color={color} />
-  );
+  return ({
+    color,
+    size,
+    focused,
+  }: {
+    color: ColorValue;
+    size: number;
+    focused: boolean;
+  }) => {
+    const iconColor =
+      typeof color === 'number' || color == null ? undefined : color;
+
+    return (
+      <Ionicons
+        name={focused ? focusedIcon : unfocusedIcon}
+        size={size}
+        color={iconColor}
+      />
+    );
+  };
 }
 
 export default function TabLayout() {
