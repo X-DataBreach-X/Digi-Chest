@@ -16,6 +16,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+// The rotatable 3D character shown in the Avatar panel.
+import CharacterViewer from '../../components/CharacterViewer';
 // Gives the screen the current light or dark colors.
 import { useTheme } from '../../constants/theme';
 
@@ -57,10 +59,10 @@ export default function InventoryScreen() {
     <View style={[styles.section, styles.avatarSection]}>
       {/* Section heading. */}
       <Text style={styles.heading}>Avatar</Text>
-      {/* Fills the panel and centers the placeholder text. */}
+      {/* Fills the rest of the panel with an outlined box for the 3D character. */}
       <View style={styles.avatarArea}>
-        {/* Stands in for the 3D avatar until it is built. */}
-        <Text style={styles.placeholderText}>3D avatar goes here</Text>
+        {/* The rotatable 3D character; drag to spin it (touch on phones, mouse on computers). */}
+        <CharacterViewer />
       </View>
     </View>
   );
@@ -332,22 +334,18 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
       // Keeps it tall enough to see the avatar on phones.
       minHeight: 300,
     },
-    // The space where the 3D avatar will be drawn.
+    // The space where the 3D avatar is drawn.
     avatarArea: {
       // Fills the rest of the avatar panel.
       flex: 1,
-      // Centers the placeholder text vertically.
-      justifyContent: 'center',
-      // Centers the placeholder text horizontally.
-      alignItems: 'center',
-      // Dashed outline marks it as unfinished.
-      borderStyle: 'dashed',
       // Thin outline.
       borderWidth: 1,
       // Outline color from the theme.
       borderColor: colors.border,
       // Rounded corners to match the panel.
       borderRadius: 8,
+      // Clips the 3D drawing to the rounded corners so it doesn't poke past the outline.
+      overflow: 'hidden',
     },
     // The section titles.
     heading: {
@@ -357,11 +355,6 @@ function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
       fontWeight: 'bold',
       // Main text color from the theme.
       color: colors.text,
-    },
-    // The faded "goes here" text.
-    placeholderText: {
-      // Faded text color from the theme.
-      color: colors.textMuted,
     },
     // The wrapping row of item boxes.
     slotGrid: {
