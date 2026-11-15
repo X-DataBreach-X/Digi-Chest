@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as Location from "expo-location";
+import CharacterViewer from "./CharacterViewer";
 import MapView, {
   PROVIDER_GOOGLE,
   type Region,
@@ -39,10 +40,12 @@ export default function MapScreen() {
 
   useEffect(() => {
     let isCancelled = false;
+    let locationSubscription: Location.LocationSubscription | null = null;
 
-    async function requestLocation() {
+    async function startLocationTracking() {
       try {
-        const permission = await Location.requestForegroundPermissionsAsync();
+        const permission =
+          await Location.requestForegroundPermissionsAsync();
 
         if (permission.status !== "granted") {
           if (!isCancelled) {
@@ -55,31 +58,58 @@ export default function MapScreen() {
           setPermissionGranted(true);
         }
 
-        const currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        const initialLocation =
+          await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
 
-        const newRegion: Region = {
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
+        const initialRegion: Region = {
+          latitude: initialLocation.coords.latitude,
+          longitude: initialLocation.coords.longitude,
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         };
 
         if (!isCancelled) {
-          setUserRegion(newRegion);
+          setUserRegion(initialRegion);
+        }
+
+        locationSubscription =
+          await Location.watchPositionAsync(
+            {
+              accuracy: Location.Accuracy.High,
+              timeInterval: 1000,
+              distanceInterval: 3,
+            },
+            (newLocation) => {
+              const newRegion: Region = {
+                latitude: newLocation.coords.latitude,
+                longitude: newLocation.coords.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              };
+
+              if (!isCancelled) {
+                setUserRegion(newRegion);
+              }
+            },
+          );
+
+        if (isCancelled) {
+          locationSubscription?.remove();
         }
       } catch {
         if (!isCancelled) {
-          setLocationError("Unable to find your location.");
+          setLocationError("Unable to track your location.");
         }
       }
     }
 
-    requestLocation();
+    startLocationTracking();
 
     return () => {
       isCancelled = true;
+      locationSubscription?.remove();
     };
   }, []);
 
@@ -102,16 +132,25 @@ export default function MapScreen() {
         customMapStyle={googleMapStyle}
         showsBuildings
         showsCompass
-        showsUserLocation={permissionGranted}
+        showsUserLocation={false}
         zoomControlEnabled={false}
         initialRegion={defaultRegion}
-        />
+      />
 
-        {locationError && (
-          <Text style={styles.error}>
-            {locationError}
-          </Text>
-        )}
+      <View
+        pointerEvents="none"
+        style={styles.avatarOverlay}
+      >
+        <View style={styles.avatarOnMap}>
+          <CharacterViewer />
+        </View>
+      </View>
+
+      {locationError && (
+        <Text style={styles.error}>
+          {locationError}
+        </Text>
+      )}
     </View>
   );
 }
@@ -120,16 +159,36 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+
   map: {
     flex: 1,
   },
+
+  avatarOverlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
+    elevation: 2,
+  },
+
+  avatarOnMap: {
+    width: 100,
+    height: 100,
+    transform: [{ translateY: 35 }],
+  },
+
   error: {
     position: "absolute",
     top: 20,
-    left: 20,
     right: 20,
+    left: 20,
     padding: 12,
-    backgroundColor: "white",
     color: "red",
+    backgroundColor: "white",
   },
 });
