@@ -32,6 +32,7 @@ const defaultRegion: Region = {
 
 export default function MapScreen() {
   const mapRef = useRef<MapView | null>(null);
+  const currentMapRegion = useRef<Region>(defaultRegion);
 
   const [userRegion, setUserRegion] = useState<Region | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
@@ -39,10 +40,12 @@ export default function MapScreen() {
 
   useEffect(() => {
     let isCancelled = false;
+    let locationSubscription: Location.LocationSubscription | null = null;
 
-    async function requestLocation() {
+    async function startLocationTracking() {
       try {
-        const permission = await Location.requestForegroundPermissionsAsync();
+        const permission =
+          await Location.requestForegroundPermissionsAsync();
 
         if (permission.status !== "granted") {
           if (!isCancelled) {
@@ -55,39 +58,83 @@ export default function MapScreen() {
           setPermissionGranted(true);
         }
 
-        const currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        const initialLocation =
+          await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
 
-        const newRegion: Region = {
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
+        const initialRegion: Region = {
+          latitude: initialLocation.coords.latitude,
+          longitude: initialLocation.coords.longitude,
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         };
 
         if (!isCancelled) {
-          setUserRegion(newRegion);
+          setUserRegion(initialRegion);
+        }
+
+        locationSubscription =
+          await Location.watchPositionAsync(
+            {
+              accuracy: Location.Accuracy.High,
+              timeInterval: 1000,
+              distanceInterval: 3,
+            },
+            (newLocation) => {
+              const newRegion: Region = {
+                latitude: newLocation.coords.latitude,
+                longitude: newLocation.coords.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              };
+
+              if (!isCancelled) {
+                setUserRegion(newRegion);
+              }
+            },
+          );
+
+        if (isCancelled) {
+          locationSubscription?.remove();
         }
       } catch {
         if (!isCancelled) {
-          setLocationError("Unable to find your location.");
+          setLocationError("Unable to track your location.");
         }
       }
     }
 
-    requestLocation();
+    startLocationTracking();
 
     return () => {
       isCancelled = true;
+      locationSubscription?.remove();
     };
   }, []);
 
   useEffect(() => {
-    if (userRegion && mapRef.current) {
-      mapRef.current.animateToRegion(userRegion, 1000);
+    if (!userRegion || !mapRef.current) {
+      return;
     }
+
+    const currentRegion = currentMapRegion.current;
+
+    const nextRegion: Region = {
+      latitude: userRegion.latitude,
+      longitude: userRegion.longitude,
+      latitudeDelta: currentRegion.latitudeDelta,
+      longitudeDelta: currentRegion.longitudeDelta,
+    };
+
+    currentMapRegion.current = nextRegion;
+
+    mapRef.current.animateToRegion(nextRegion, 500);
   }, [userRegion]);
+
+  function rememberMapRegion(region: Region) {
+    currentMapRegion.current = region;
+  }
 
   return (
     <View style={styles.container}>
@@ -104,14 +151,22 @@ export default function MapScreen() {
         showsCompass
         showsUserLocation={permissionGranted}
         zoomControlEnabled={false}
+        scrollEnabled={false}
+        zoomEnabled
+        rotateEnabled
+        pitchEnabled={false}
+        scrollDuringRotateOrZoomEnabled={false}
+        minDelta={0.004}
+        maxDelta={0.025}
+        onRegionChangeComplete={rememberMapRegion}
         initialRegion={defaultRegion}
-        />
+      />
 
-        {locationError && (
-          <Text style={styles.error}>
-            {locationError}
-          </Text>
-        )}
+      {locationError && (
+        <Text style={styles.error}>
+          {locationError}
+        </Text>
+      )}
     </View>
   );
 }
@@ -120,16 +175,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+
   map: {
     flex: 1,
   },
+
   error: {
     position: "absolute",
     top: 20,
-    left: 20,
     right: 20,
+    left: 20,
     padding: 12,
-    backgroundColor: "white",
     color: "red",
+    backgroundColor: "white",
   },
 });
