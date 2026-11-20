@@ -8,7 +8,7 @@ The Expo app is connected to Firebase Data Connect. `App.tsx` loads the public i
 
 Talmage - Map
 Silas - Leaderboard & Firebase
-Thomas - Marketplace
+Thomas - Inventory
 Jason - Settings & Authentication
 
 ## Technology
@@ -57,7 +57,7 @@ Digi-Chest/
 │       ├── _layout.tsx       # Tab bar setup (order, titles, icons)
 │       ├── index.tsx         # Interactive Map page
 │       ├── leaderboard.tsx   # Leaderboard page
-│       ├── marketplace.tsx   # Marketplace page
+│       ├── inventory.tsx     # Inventory page
 │       └── settings.tsx      # Settings page
 ├── components/      # Reusable UI components
 ├── constants/       # Shared values such as colors
