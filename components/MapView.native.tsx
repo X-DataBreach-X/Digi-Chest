@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import * as Location from "expo-location";
-import CharacterViewer from "./CharacterViewer";
 import MapView, {
   PROVIDER_GOOGLE,
   type Region,
@@ -33,6 +32,7 @@ const defaultRegion: Region = {
 
 export default function MapScreen() {
   const mapRef = useRef<MapView | null>(null);
+  const currentMapRegion = useRef<Region>(defaultRegion);
 
   const [userRegion, setUserRegion] = useState<Region | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
@@ -114,10 +114,27 @@ export default function MapScreen() {
   }, []);
 
   useEffect(() => {
-    if (userRegion && mapRef.current) {
-      mapRef.current.animateToRegion(userRegion, 1000);
+    if (!userRegion || !mapRef.current) {
+      return;
     }
+
+    const currentRegion = currentMapRegion.current;
+
+    const nextRegion: Region = {
+      latitude: userRegion.latitude,
+      longitude: userRegion.longitude,
+      latitudeDelta: currentRegion.latitudeDelta,
+      longitudeDelta: currentRegion.longitudeDelta,
+    };
+
+    currentMapRegion.current = nextRegion;
+
+    mapRef.current.animateToRegion(nextRegion, 500);
   }, [userRegion]);
+
+  function rememberMapRegion(region: Region) {
+    currentMapRegion.current = region;
+  }
 
   return (
     <View style={styles.container}>
@@ -132,19 +149,18 @@ export default function MapScreen() {
         customMapStyle={googleMapStyle}
         showsBuildings
         showsCompass
-        showsUserLocation={false}
+        showsUserLocation={permissionGranted}
         zoomControlEnabled={false}
+        scrollEnabled={false}
+        zoomEnabled
+        rotateEnabled
+        pitchEnabled={false}
+        scrollDuringRotateOrZoomEnabled={false}
+        minDelta={0.004}
+        maxDelta={0.025}
+        onRegionChangeComplete={rememberMapRegion}
         initialRegion={defaultRegion}
       />
-
-      <View
-        pointerEvents="none"
-        style={styles.avatarOverlay}
-      >
-        <View style={styles.avatarOnMap}>
-          <CharacterViewer />
-        </View>
-      </View>
 
       {locationError && (
         <Text style={styles.error}>
@@ -162,24 +178,6 @@ const styles = StyleSheet.create({
 
   map: {
     flex: 1,
-  },
-
-  avatarOverlay: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 2,
-    elevation: 2,
-  },
-
-  avatarOnMap: {
-    width: 100,
-    height: 100,
-    transform: [{ translateY: 35 }],
   },
 
   error: {
